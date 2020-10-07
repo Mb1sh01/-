@@ -1,0 +1,16 @@
+png("plot-ex05.png", width=600)
+set.seed(4)
+x <- rf(n = 300, df1 = 3, df2 = 112)
+e <- rnorm(300, 0, 4)
+y <- 5 - 3*x + e
+median.result1 <- median(x)
+print(median.result1)
+median.result2 <- median(y)
+print(median.result2)
+layout(matrix(c(1, 2, 2, 1, 2, 2, 3, 4, 4),nrow = 3, byrow=T))
+boxplot(y, pch = 0, cex = 1, range = 1.5, col = "green")
+plot(x, y, abline(v=median.result1,h=median.result2,lty=2),pch = 21, cex = 1, col = "green")
+
+plot(x, y, xlab = "", ylab = "", axes = F, col = "white")
+boxplot(x, pch = 21, cex = 1, horizontal = TRUE, range = 1.5, col = "green")
+dev.off()
