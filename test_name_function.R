@@ -1,0 +1,4 @@
+source('Name_function.R')
+FunctionName(4,300,3,112,0,4)
+dev.off()
+FunctionName(15,300,3,112,0,4)
