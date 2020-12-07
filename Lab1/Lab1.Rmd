@@ -39,7 +39,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r import, echo = FALSE}
 DF <- read.csv("Данные_Блинов.csv",stringsAsFactors = F,sep =";")
-reg.df = DF[, -1]
+reg.df = DF[,-1]
 reg.df = na.omit(reg.df)
 ```
 
@@ -47,9 +47,9 @@ reg.df = na.omit(reg.df)
 
 ```{r reg.df, echo = FALSE}
 # Среднее арифметическое
-mns <- round(apply(reg.df[, 1:5], 2, mean), 1)
+mns <- round(apply(reg.df[, 2:6], 2, mean), 1)
 # Стандартные оклонения
-sds <- round(apply(reg.df[, 1:5], 2, sd), 1)
+sds <- round(apply(reg.df[, 2:6], 2, sd), 1)
 # Коэффициенты вариации
 coef.vars <- round(sds/mns*100, 1)
 smm <- rbind(mns, sds, coef.vars)
@@ -68,7 +68,7 @@ par(mfrow = c(3, 2))           # разбить полотно на 6 часте
 par(oma = c(0, 0, 1.5, 0))     # внешние поля общего полотна
 par(mar = c(4, 4, 0.5, 0.5))   # внутренние поля каждого графика
 # цикл по номерам столбцов с количественными переменными
-for (i in 1:5) {
+for (i in 2:6) {
   # данные -- i-ый столбец фрейма
   x <- reg.df[, i]
   
@@ -99,10 +99,10 @@ par(mfrow = c(1, 1))
 
 ```{r, echo = FALSE}
 # тест Андерсона-Дарлинга на нормальность распределения
-W <- sapply(reg.df[, 1:5], function(x) {
+W <- sapply(reg.df[, 2:6], function(x) {
   round(ad.test(x)$statistic, 4)
 })
-p <- sapply(reg.df[, 1:5], function(x) {
+p <- sapply(reg.df[, 2:6], function(x) {
   round(ad.test(x)$p.value,4)
 })
 table <- rbind(W, p)
@@ -115,7 +115,7 @@ kable(table)
 ### Графики разброса
 
 ```{r,echo = FALSE, fig.width = 6, fig.height = 5}
-pairs(reg.df, pch = 16, col = rgb(0, 0.8, 0, alpha = 0.4), bg = rgb(0, 0.8, 0, alpha = 0.4), cex = 1.4)
+pairs(reg.df[,-1], pch = 16, col = rgb(0, 0.8, 0, alpha = 0.4), bg = rgb(0, 0.8, 0, alpha = 0.4), cex = 1.4)
 
 ```
 
@@ -123,7 +123,7 @@ pairs(reg.df, pch = 16, col = rgb(0, 0.8, 0, alpha = 0.4), bg = rgb(0, 0.8, 0, a
 
 ```{r, echo = FALSE}
 # коэффициенты Пирсона с P-значениями
-r.corr <- rcorr(as.matrix(reg.df))
+r.corr <- rcorr(as.matrix(reg.df[,-1]))
 # Визуализация корреляционной матрицы  =========================================
 # сохраняем корреляционную матрицу
 matrix.cor <- r.corr$r
@@ -152,7 +152,13 @@ title(ylab = 'Корреляция показателей')
 ## Описательная статистика логарифмированных данных:
 
 ```{r, echo = FALSE}
-reg.df1 <- log(reg.df)
+DF1 <- reg.df    
+DF1$Ob.ot.t.2017 <- log(reg.df$Ob.ot.t.2017)
+DF1$ind.price.2017 <- log(reg.df$ind.price.2017)
+DF1$izm.sr.2017 <- log(reg.df$izm.sr.2017)
+DF1$ind.phis.2016 <- log(reg.df$ind.phis.2016)
+DF1$sum.ub.2017 <- log(reg.df$sum.ub.2017)
+reg.df1 <- log(reg.df[,-1])
 ```
 
 ```{r reg.df1, echo = FALSE}
