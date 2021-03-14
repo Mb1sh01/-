@@ -1,0 +1,9 @@
+count = 0
+maxim_list = []
+for n in range(1000, 10000):
+  if n <= 6 ** 5 - 1 and n % 36 in (9, 10,):
+    maxim_list.append(n)
+    count += 1
+
+maxim = max(maxim_list)
+print(count, maxim)
