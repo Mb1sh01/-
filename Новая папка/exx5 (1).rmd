@@ -1,0 +1,680 @@
+---
+title: "Упражнение 5"
+author: "Блинов Илья"
+date: "15 03 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# загрузка пакетов
+library('ISLR')         # загружаем пакет
+library('GGally')       # графики совместного разброса переменных
+library('lmtest')       # тесты остатков регрессионных моделей
+library('FNN')          # алгоритм kNN
+library('boot')              # расчёт ошибки с кросс-валидацией
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Вариант 4
+
+1 Оценить стандартную ошибку модели для линейных регрессионных моделей из упражнения 4 (варианты ниже): а) со всеми объясняющими переменными; б) только с непрерывными объясняющими переменными:
+
+ - методом проверочной выборки с долей обучающей 50%;
+
+ - методом LOOCV;
+
+ - k-кратной кросс-валидацией с k=5 и k=10.
+
+Выбрать лучшую модель по минимуму ошибки. Все ли методы кросс-валидации сходятся на одной и той же модели?
+
+
+2 Оценить стандартные ошибки параметров лучшей модели регрессии методом бутстрепа. Вывести график остатков лучшей модели. Сравнить с оценками стандартных ошибок параметров по МНК.
+
+
+### Описание переменных
+
+mpg - миль на галлон 
+weight - Масса автомобиля (кг.) 
+year - год модели машины (г.) 
+acceleration - Время разгона от 0 до 60 миль в час (сек.) 
+cylinders - Количество цилиндров от 4 до 8 
+Размерность обучающей выборки: n = 397 строк, p = 4 объясняющих переменных. Зависимая переменная – mpg.
+
+### Метод перекрёстной проверки
+Рассмотрим данные с характеристиками автомобилей Auto из пакета ISLR. Скопируем таблицу во фрейм DF.auto для дальнейших манипуляций.
+
+
+```{r}
+
+my.seed <- 4
+
+Auto <- subset(Auto, select = c(mpg, weight, year, acceleration, cylinders))
+
+DF.auto <- Auto
+
+head(DF.auto)
+
+```
+
+
+## Oписательные статистики по переменным
+
+```{r}
+
+summary(DF.auto)
+
+```
+
+В таблице данных 392 наблюдений и 4 переменных, среди которых есть непрерывные количественные и дискретные количественные и одна номинальная (name, название модели автомобиля, сохранено как фактор). В данном случае по функции summary() сложно определить реальные типы переменных, помогает table() от отдельных столбцов таблицы: если уникальных значений немного, перед нами фактор.
+
+
+#### Количество цилиндров
+
+```{r}
+
+table(DF.auto$cylinders)
+
+```
+
+
+Построим графики разброса, показав факторы *cylinders* (число цилиндров)  цветом. Зависимой переменной модели является *mpg*, её покажем в первой строке / столбце матричного графика. Во вторую строку / столбец поставим фактор.
+
+
+```{r}
+
+# переводим дискретные количественные переменные в факторы
+DF.auto$cylinders <- as.factor(DF.auto$cylinders)
+
+# графики разброса, цвет -- количество цилиндров
+ggpairs(DF.auto[, c(1, 2, 5)], ggplot2::aes(color = cylinders))
+
+ggpairs(DF.auto[, c(1, 3, 5)], ggplot2::aes(color = cylinders))
+
+ggpairs(DF.auto[, c(1, 4, 5)], ggplot2::aes(color = cylinders))
+```
+
+
+#### Только mpg ~ weight,  mpg ~ year,  mpg ~ acceleration
+```{r}
+
+plot(DF.auto$weight, DF.auto$mpg,
+     xlab = 'weight', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+
+plot(DF.auto$year, DF.auto$mpg,
+     xlab = 'year', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+
+plot(DF.auto$acceleration, DF.auto$mpg,
+     xlab = 'acceleration', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+
+```
+
+
+## Метод проверочной выборки
+
+Он состоит в том, что мы отбираем одну тестовую выборку и будем считать на ней ошибку модели
+
+```{r}
+
+# общее число наблюдений
+n <- nrow(DF.auto)
+
+# доля обучающей выборки
+train.percent <- 0.5
+
+# выбрать наблюдения в обучающую выборку
+set.seed(my.seed)
+inTrain <- sample(1:n, n * train.percent)
+
+# фактические значения Y на тестовой выборке
+y.test.fact <- DF.auto$mpg[-inTrain]
+
+# рисуем разными цветами обучающую и тестовую
+plot(DF.auto$weight[inTrain], DF.auto$mpg[inTrain],
+     xlab = 'weight', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+points(DF.auto$weight[-inTrain], DF.auto$mpg[-inTrain],
+       pch = 21, col = rgb(1, 0, 0, alpha = 0.4), 
+       bg = rgb(1, 0, 0, alpha = 0.4))
+legend('topright', 
+       pch = c(16, 16), col = c('blue', 'red'), legend = c('test', 'train'))
+
+plot(DF.auto$year[inTrain], DF.auto$mpg[inTrain],
+     xlab = 'year', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+points(DF.auto$year[-inTrain], DF.auto$mpg[-inTrain],
+       pch = 21, col = rgb(1, 0, 0, alpha = 0.4), 
+       bg = rgb(1, 0, 0, alpha = 0.4))
+legend('topright', 
+       pch = c(16, 16), col = c('blue', 'red'), legend = c('test', 'train'))
+
+plot(DF.auto$acceleration[inTrain], DF.auto$mpg[inTrain],
+     xlab = 'acceleration', ylab = 'mpg', pch = 21,
+     col = rgb(0, 0, 1, alpha = 0.4), bg = rgb(0, 0, 1, alpha = 0.4))
+points(DF.auto$acceleration[-inTrain], DF.auto$mpg[-inTrain],
+       pch = 21, col = rgb(1, 0, 0, alpha = 0.4), 
+       bg = rgb(1, 0, 0, alpha = 0.4))
+legend('topright', 
+       pch = c(16, 16), col = c('blue', 'red'), legend = c('test', 'train'))
+```
+Построим модели для проверки точности со всеми объясняющими переменными.
+
+
+Вид моделей:
+
+$$mpg=f(weight + year + acceleration + cylinders)$$
+Линейная модель: 
+
+$$mpg=β_0+β_1⋅weihgt +β_2 year +β_3 acceleration+ cylinders$$
+
+
+
+```{r, warning=FALSE}
+
+# присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.1_1 <- lm(mpg ~ weight + year + acceleration + cylinders, subset = inTrain)
+
+# подгонка линейной модели на обучающей выборке
+fit.lm.1_1 <- lm(mpg ~ weight + year + acceleration + cylinders, 
+               subset = inTrain)
+# прогноз на тестовую
+y.test.lm.1_1 <- predict(fit.lm.1_1, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.1_1 <- mean((y.test.fact - y.test.lm.1_1)^2)
+
+# отсоединить таблицу с данными
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.1_1
+
+```
+
+
+Строим квадратичную модель: 
+
+$$mpg = β_0 + β_1weight + β_2 year + β_3 acceleration + β_4weight^2 + β_5 year^2 + β_6 acceleration^2 + β_7 cylinders + β_8 sylinders^2$$
+
+
+```{r}
+
+# присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.2_1 <- lm(mpg ~ poly(weight, 2) + poly(year, 2) + poly(acceleration, 2) + cylinders, subset = inTrain)
+
+# прогноз на тестовую
+y.test.lm.2_1 <- predict(fit.lm.2_1, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.2_1 <- round(mean((y.test.fact - y.test.lm.2_1)^2), 2)
+
+# отсоединить таблицу с данными
+
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.2_1
+
+```
+
+
+## Строим кубическую модель: 
+
+$$mpg=β_0+β_1weight+β_1weight + β_2 year + β_3 acceleration+ β_5 year^2 + 
+
++β_6 acceleration^2+ + β_4weight^2  β_4weight^2 + β_5 year^2 + β_6 acceleration^2+β_7⋅weight^3+ β_8 year^3 + β_9 acceleration^3 + β_10 sylinders + β_11 sylinders^2 + β_12 sylinders^3$$
+
+
+ Присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+
+
+```{r}
+
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.3_1 <- lm(mpg ~ poly(weight, 3)  + poly(year, 3) + poly(acceleration, 3) + cylinders, 
+               subset = inTrain)
+
+# прогноз на тестовую
+y.test.lm.3_1 <- predict(fit.lm.3_1, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.3_1 <- round(mean((y.test.fact - y.test.lm.3_1)^2), 2)
+
+# отсоединить таблицу с данными
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.3_1
+
+```
+
+
+## Перекрёстная проверка по отдельным наблюдениям (LOOCV)
+
+Это самый затратный в вычислительном плане метод, но и самый надёжный в плане оценки ошибки вне выборки. Попробуем применить его к линейной модели.
+
+
+```{r}
+
+# подгонка линейной модели на обучающей выборке
+fit.glm_1 <- glm(mpg ~ weight + year + acceleration + cylinders, data = DF.auto)
+
+# считаем LOOCV-ошибку
+cv.err_1 <- cv.glm(DF.auto, fit.glm_1)
+
+# результат: первое число -- по формуле LOOCV-ошибки,
+#  второе -- с поправкой на смещение
+cv.err_1$delta[1]
+
+```
+
+
+Теперь оценим точность полиномиальных моделей, меняя степень, в которой стоит регрессор.
+
+
+```{r}
+
+# вектор с LOOCV-ошибками
+cv.err.loocv_1 <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.loocv_1) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm_1 <- glm(mpg ~ poly(weight, i)  + poly(year, i) + poly(acceleration, i) + cylinders, data = DF.auto)
+  # расчёт ошибки
+  cv.err.loocv_1[i] <- cv.glm(DF.auto, fit.glm_1)$delta[1]
+}
+
+# результат
+cv.err.loocv_1
+
+```
+
+
+# 5-ти кратная 
+
+```{r}
+
+
+# оценим точность полиномиальных моделей, меняя степень
+# вектор с ошибками по 5-ти кратной кросс-валидации
+cv.err.k.fold5_1 <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.k.fold5_1) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm_1 <- glm(mpg ~ poly(weight, i) + poly(year, i) + poly(acceleration, i) + cylinders, data = DF.auto)
+  # расчёт ошибки
+  cv.err.k.fold5_1[i] <- cv.glm(DF.auto, fit.glm_1, K = 5)$delta[1]
+}
+
+# результат
+cv.err.k.fold5_1
+
+```
+
+
+# 10-ти кратная
+
+```{r}
+
+# оценим точность полиномиальных моделей, меняя степень
+# вектор с ошибками по 10-кратной кросс-валидации
+cv.err.k.fold10_1 <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.k.fold10_1) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm_1 <- glm(mpg ~ poly(weight, i) + poly(year, i) + poly(acceleration, i) + cylinders, data = DF.auto)
+  # расчёт ошибки
+  cv.err.k.fold10_1[i] <- cv.glm(DF.auto, fit.glm_1, K = 10)$delta[1]
+}
+
+# результат
+cv.err.k.fold10_1
+
+```
+
+
+
+Построим модели для проверки точности только c непрерывными переменными.
+
+Вид моделей:
+
+$$mpg=f(weight + year + acceleration)$$
+Линейная модель: 
+
+$$mpg=β_0+β_1⋅weihgt +β_2 year +β_3 acceleration$$
+
+
+
+```{r, warning=FALSE}
+
+# присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.1 <- lm(mpg ~ weight + year + acceleration, subset = inTrain)
+
+# подгонка линейной модели на обучающей выборке
+fit.lm.1 <- lm(mpg ~ weight + year + acceleration, 
+               subset = inTrain)
+# прогноз на тестовую
+y.test.lm.1 <- predict(fit.lm.1, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.1 <- mean((y.test.fact - y.test.lm.1)^2)
+
+# отсоединить таблицу с данными
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.1
+
+```
+
+
+Строим квадратичную модель: 
+
+$$mpg = β_0 + β_1weight + β_2 year + β_3 acceleration + β_4weight^2 + β_5 year^2 + β_6 acceleration^2$$
+
+
+```{r}
+
+# присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.2 <- lm(mpg ~ poly(weight, 2) + poly(year, 2) + poly(acceleration, 2), subset = inTrain)
+
+# прогноз на тестовую
+y.test.lm.2 <- predict(fit.lm.2, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.2 <- round(mean((y.test.fact - y.test.lm.2)^2), 2)
+
+# отсоединить таблицу с данными
+
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.2
+
+```
+
+
+## Строим кубическую модель: 
+
+$$mpg=β_0+β_1weight+β_1weight + β_2 year + β_3 acceleration+ β_5 year^2 + 
+
++β_6 acceleration^2+ + β_4weight^2  β_4weight^2 + β_5 year^2 + β_6 acceleration^2+β_7⋅weight^3+ β_8 year^3 + β_9 acceleration^3$$
+
+
+ Присоединить таблицу с данными: названия стоблцов будут доступны напрямую
+
+
+```{r}
+
+attach(DF.auto)
+
+# подгонка модели на обучающей выборке
+fit.lm.3 <- lm(mpg ~ poly(weight, 3)  + poly(year, 3) + poly(acceleration, 3), 
+               subset = inTrain)
+
+# прогноз на тестовую
+y.test.lm.3 <- predict(fit.lm.3, DF.auto[-inTrain, ])
+
+# считаем MSE на тестовой выборке
+MSE.lm.3 <- round(mean((y.test.fact - y.test.lm.3)^2), 2)
+
+# отсоединить таблицу с данными
+detach(DF.auto)
+
+# смотрим ошибку
+MSE.lm.3
+
+```
+
+
+## Перекрёстная проверка по отдельным наблюдениям (LOOCV)
+
+Это самый затратный в вычислительном плане метод, но и самый надёжный в плане оценки ошибки вне выборки. Попробуем применить его к линейной модели.
+
+
+```{r}
+
+# подгонка линейной модели на обучающей выборке
+fit.glm <- glm(mpg ~ weight + year + acceleration, data = DF.auto)
+
+# считаем LOOCV-ошибку
+cv.err <- cv.glm(DF.auto, fit.glm)
+
+# результат: первое число -- по формуле LOOCV-ошибки,
+#  второе -- с поправкой на смещение
+cv.err$delta[1]
+
+```
+
+
+Теперь оценим точность полиномиальных моделей, меняя степень, в которой стоит регрессор.
+
+
+```{r}
+
+# вектор с LOOCV-ошибками
+cv.err.loocv <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.loocv) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm <- glm(mpg ~ poly(weight, i)  + poly(year, i) + poly(acceleration, i), data = DF.auto)
+  # расчёт ошибки
+  cv.err.loocv[i] <- cv.glm(DF.auto, fit.glm)$delta[1]
+}
+
+# результат
+cv.err.loocv
+
+```
+
+
+## k-кратная перекрёстная проверка
+
+K-кратная кросс-валидация – компромисс между методом проверочной выборки и LOOCV. Оценка ошибки вне выборки ближе к правде, по сравнению с проверочной выборкой, а объём вычислений меньше, чем при LOOCV. Проведём 10-ти кратную и 5-ти кратную кросс-валидацию моделей разных степеней.
+
+# 5-ти кратная 
+
+```{r}
+
+
+# оценим точность полиномиальных моделей, меняя степень
+# вектор с ошибками по 5-ти кратной кросс-валидации
+cv.err.k.fold5 <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.k.fold5) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm <- glm(mpg ~ poly(weight, i) + poly(year, i) + poly(acceleration, i), data = DF.auto)
+  # расчёт ошибки
+  cv.err.k.fold5[i] <- cv.glm(DF.auto, fit.glm, K = 5)$delta[1]
+}
+
+# результат
+cv.err.k.fold5
+
+```
+
+
+# 10-ти кратная
+
+```{r}
+
+# оценим точность полиномиальных моделей, меняя степень
+# вектор с ошибками по 10-кратной кросс-валидации
+cv.err.k.fold10 <- rep(0, 5)
+# имена элементов вектора
+names(cv.err.k.fold10) <- 1:5
+
+# цикл по степеням полиномов
+for (i in 1:5) {
+  # оценка модели
+  fit.glm <- glm(mpg ~ poly(weight, i) + poly(year, i) + poly(acceleration, i), data = DF.auto)
+  # расчёт ошибки
+  cv.err.k.fold10[i] <- cv.glm(DF.auto, fit.glm, K = 10)$delta[1]
+}
+
+# результат
+cv.err.k.fold10
+
+```
+
+
+Объединим все ошибки в одну таблицу и отсортируем её по возрастанию MSE (с непрерывными) и MSE.1 (со всеми обяняющими переменными):
+
+
+```{r}
+
+# записываем все ошибки в таблицу
+df.MSE <- data.frame(Модель = c('Линейная', 'Полином 2 степени',
+                                'Полином 3 степени', 
+                                rep(paste('Полином', 1:5, 'степени '), 3)), 
+                     Проверка.точности = c(rep('Проверочная выборка 50%', 3),
+                                           rep('LOOCV', 5), 
+                                           rep('Кросс-валидация, k = 5', 5),
+                                           rep('Кросс-валидация, k = 10', 5)),
+                     MSE = round(c(MSE.lm.1, MSE.lm.2, MSE.lm.3, 
+                                  cv.err.loocv, cv.err.k.fold10, cv.err.k.fold5), 2), 
+                     MSE = round(c(MSE.lm.1_1, MSE.lm.2_1, MSE.lm.3_1, 
+                                  cv.err.loocv_1, cv.err.k.fold10_1, cv.err.k.fold5_1), 2))
+
+# все модели по возрастанию ошибки
+df.MSE[order(df.MSE$MSE), ]
+
+```
+
+
+Опираясь на результаты расчётов с кросс-валидацией, можно заключить, что на самом деле ошибка вне выборки у линейной модели выше, чем показывала MSE на тестовой выборке. В целом, ошибка методом проверочной выборки размером 50% от числа наблюдений занижает MSE и, следовательно, завышает точность моделей. Та же ситуация наблюдается и у моделей со всеми обяъсняющими переменными.
+
+
+# Бутстреп
+
+## Точность оценки параметра регрессии
+
+При построении модели регрессии проблемы в остатках приводят к неверной оценке ошибок параметров. Обойти эту проблему можно, применив для расчёта этих ошибок бутстреп.
+
+
+```{r}
+
+# Оценивание точности линейной регрессионной модели ----------------------------
+
+# оценить стандартные ошибки параметров модели 
+#  mpg = beta_0 + beta_1 * horsepower с помощью бутстрепа,
+#  сравнить с оценками ошибок по МНК
+
+# функция для расчёта коэффициентов ПЛР по выборке из данных
+boot.fn <- function(data, index){
+  coef(lm(mpg ~ weight + year + acceleration, data = data, subset = index))
+}
+boot.fn(DF.auto, 1:n)
+
+```
+
+
+# применениe функции к бутстреп-выборке
+
+```{r}
+
+set.seed(my.seed)
+boot.fn(DF.auto, sample(n, n, replace = T))
+
+```
+
+
+применяем функцию boot для вычисления стандартных ошибок параметров
+
+```{r}
+ 
+#  (1000 выборок с повторами)
+boot(DF.auto, boot.fn, 1000)
+
+```
+
+
+ сравним с ошибками параметров по МНК
+
+```{r}
+# К
+summary(fit.lm.1)$coef
+summary(fit.lm.1_1)$coef
+
+```
+
+
+ график остатков модели
+
+```{r}
+ 
+plot(fit.lm.1, 3)
+plot(fit.lm.1_1, 3)
+
+```
+
+
+
+```{r}
+
+# вычислим оценки параметров квадратичной модели регрессии
+boot.fn.2 <- function(data, index){
+  coef(lm(mpg ~ poly(weight, 2) + poly(year, 2) +  poly(acceleration, 2), data = data, subset = index))
+}
+# применим функцию к 1000 бутсреп-выборкам
+set.seed(my.seed)
+boot(DF.auto, boot.fn.2, 1000)
+
+```
+
+сравним с ошибками параметров по МНК
+
+```{r}
+
+summary(fit.lm.2)$coef
+summary(fit.lm.2_1)$coef
+
+```
+
+
+график остатков модели
+
+```{r}
+
+plot(fit.lm.2, 3)
+plot(fit.lm.2_1, 3)
+
+```
+
+Нелинейность в остатках полинома третьей степени остаётся, и бутстреп-ошибки параметров модели выше, чем аналогичные МНК-оценки. 
+
+При сопоставлении ошибок параметров, полученных с помощью МНК и бутстрепом заметим, что они достаточо близки, но не эдентичны.
